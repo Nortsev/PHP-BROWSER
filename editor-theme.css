@@ -1,0 +1,80 @@
+/* Catppuccin Mocha — тема редактора */
+.cm-s-phpbrowser.CodeMirror {
+  background: #11111b;
+  color: #cdd6f4;
+}
+
+.cm-s-phpbrowser div.CodeMirror-selected {
+  background: #45475a88;
+}
+
+.cm-s-phpbrowser.CodeMirror-focused div.CodeMirror-selected {
+  background: #585b7099;
+}
+
+.cm-s-phpbrowser .CodeMirror-gutters {
+  background: #181825;
+  border-right: 1px solid #313244;
+}
+
+.cm-s-phpbrowser .CodeMirror-linenumber {
+  color: #585b70;
+  padding: 0 8px 0 4px;
+}
+
+.cm-s-phpbrowser .CodeMirror-cursor {
+  border-left: 2px solid #f5e0dc;
+}
+
+.cm-s-phpbrowser .CodeMirror-activeline-background {
+  background: #1e1e2e55;
+}
+
+.cm-s-phpbrowser .CodeMirror-matchingbracket {
+  color: #a6e3a1 !important;
+  background: #a6e3a122;
+  outline: 1px solid #a6e3a144;
+}
+
+.cm-s-phpbrowser .cm-meta { color: #6c7086; }
+.cm-s-phpbrowser .cm-comment { color: #6c7086; font-style: italic; }
+.cm-s-phpbrowser .cm-string { color: #a6e3a1; }
+.cm-s-phpbrowser .cm-string-2 { color: #94e2d5; }
+.cm-s-phpbrowser .cm-number { color: #fab387; }
+.cm-s-phpbrowser .cm-atom { color: #fab387; }
+.cm-s-phpbrowser .cm-keyword { color: #cba6f7; }
+.cm-s-phpbrowser .cm-operator { color: #89dceb; }
+.cm-s-phpbrowser .cm-variable { color: #cdd6f4; }
+.cm-s-phpbrowser .cm-variable-2 { color: #89b4fa; }
+.cm-s-phpbrowser .cm-variable-3 { color: #74c7ec; }
+.cm-s-phpbrowser .cm-def { color: #89b4fa; }
+.cm-s-phpbrowser .cm-property { color: #89b4fa; }
+.cm-s-phpbrowser .cm-tag { color: #f38ba8; }
+.cm-s-phpbrowser .cm-attribute { color: #fab387; }
+.cm-s-phpbrowser .cm-builtin { color: #f9e2af; }
+.cm-s-phpbrowser .cm-qualifier { color: #f9e2af; }
+.cm-s-phpbrowser .cm-header { color: #f38ba8; font-weight: 600; }
+.cm-s-phpbrowser .cm-link { color: #89b4fa; text-decoration: underline; }
+.cm-s-phpbrowser .cm-error { color: #f38ba8; background: #f38ba822; }
+
+.cm-search-match {
+  background: #f9e2af44;
+  border-radius: 2px;
+}
+
+#editor-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#editor-wrap .CodeMirror {
+  height: 100%;
+  font-family: 'SF Mono', Menlo, Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+#editor-wrap .CodeMirror-scroll {
+  padding-bottom: 0;
+}

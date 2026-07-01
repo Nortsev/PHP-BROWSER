@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-src http://localhost:8080;">
+  <title>PHP Browser</title>
+  <link rel="stylesheet" href="node_modules/codemirror/lib/codemirror.css">
+  <link rel="stylesheet" href="node_modules/codemirror/addon/selection/active-line.css">
+  <link rel="stylesheet" href="editor-theme.css">
+  <link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #sidebar {
+      width: 320px;
+      min-width: 260px;
+      flex-shrink: 0;
+      background: #181825;
+      border-right: 1px solid #313244;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #sidebar-header {
+      padding: 14px;
+      border-bottom: 1px solid #313244;
+    }
+
+    #sidebar-header h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #a6adc8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .toolbar button {
+      flex: 1;
+      padding: 7px 0;
+      background: #313244;
+      border: 1px solid #45475a;
+      border-radius: 6px;
+      color: #cdd6f4;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .toolbar button:hover { background: #45475a; }
+
+    #search {
+      width: 100%;
+      padding: 8px 12px;
+      background: #1e1e2e;
+      border: 1px solid #313244;
+      border-radius: 6px;
+      color: #cdd6f4;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #search:focus { border-color: #89b4fa; }
+
+    #dir-panel {
+      border-bottom: 1px solid #313244;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    #dir-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: #11111b;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    #dir-panel-header span {
+      font-size: 11px;
+      font-weight: 600;
+      color: #6c7086;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    #dir-panel-header .arrow {
+      font-size: 10px;
+      color: #6c7086;
+      transition: transform 0.2s;
+    }
+
+    #dir-panel-header.collapsed .arrow { transform: rotate(-90deg); }
+
+    #dir-list {
+      padding: 4px 8px 8px;
+    }
+
+    .dir-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      color: #a6adc8;
+      word-break: break-all;
+      line-height: 1.3;
+    }
+
+    .dir-item:hover { background: #313244; }
+
+    .dir-item .dir-path { flex: 1; }
+
+    .dir-item .dir-remove {
+      background: none;
+      border: none;
+      color: #585b70;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 2px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .dir-item .dir-remove:hover { color: #f38ba8; }
+
+    .dir-empty-hint {
+      padding: 8px 10px;
+      font-size: 11px;
+      color: #a6adc8;
+      line-height: 1.4;
+    }
+
+    #btn-add-dir {
+      width: 100%;
+      padding: 6px;
+      margin-top: 4px;
+      background: transparent;
+      border: 1px dashed #45475a;
+      border-radius: 5px;
+      color: #6c7086;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    #btn-add-dir:hover { border-color: #89b4fa; color: #89b4fa; }
+
+    #folder-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      margin-top: 4px;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .group-header:first-child { margin-top: 0; }
+    .group-header:hover { background: #313244; }
+
+    .group-header .chevron {
+      font-size: 10px;
+      color: #6c7086;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+      width: 12px;
+      text-align: center;
+    }
+
+    .group-header.collapsed .chevron { transform: rotate(-90deg); }
+
+    .group-header .group-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: #a6adc8;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .group-header .group-count {
+      font-size: 10px;
+      color: #585b70;
+      flex-shrink: 0;
+    }
+
+    .group-items {
+      overflow: hidden;
+      transition: max-height 0.25s ease, opacity 0.2s ease;
+    }
+
+    .group-items.collapsed {
+      max-height: 0 !important;
+      opacity: 0;
+    }
+
+    .folder-item {
+      padding: 7px 12px 7px 28px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #bac2de;
+      transition: background 0.15s;
+      word-break: break-word;
+    }
+
+    .folder-item:hover { background: #313244; }
+    .folder-item.active {
+      background: linear-gradient(90deg, #89b4fa22, #89b4fa11);
+      border-left: 3px solid #89b4fa;
+      color: #89b4fa;
+      font-weight: 600;
+    }
+
+    .folder-star { color: #f9e2af; margin-right: 4px; font-size: 10px; }
+
+    #search-row { display: flex; flex-direction: column; gap: 6px; }
+
+    .search-opt {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #6c7086;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .search-opt input { accent-color: #89b4fa; }
+
+    #recents-panel, #bookmarks-panel {
+      border-bottom: 1px solid #313244;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    .side-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: #11111b;
+      cursor: pointer;
+      user-select: none;
+      font-size: 11px;
+      font-weight: 600;
+      color: #6c7086;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .side-panel-header .arrow { font-size: 10px; transition: transform 0.2s; }
+    .side-panel-header.collapsed .arrow { transform: rotate(-90deg); }
+
+    .side-item {
+      padding: 5px 14px 5px 20px;
+      font-size: 12px;
+      color: #a6adc8;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .side-item:hover { background: #313244; color: #cdd6f4; }
+    .side-empty { padding: 8px 14px; font-size: 11px; color: #585b70; }
+
+    #tabs-bar {
+      display: flex;
+      align-items: center;
+      background: #181825;
+      border-bottom: 1px solid #313244;
+      min-height: 32px;
+      flex-shrink: 0;
+    }
+
+    #tabs-list {
+      display: flex;
+      flex: 1;
+      overflow-x: auto;
+      min-width: 0;
+    }
+
+    .preview-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: #6c7086;
+      border-right: 1px solid #313244;
+      cursor: pointer;
+      max-width: 200px;
+      flex-shrink: 0;
+    }
+
+    .preview-tab.active {
+      background: #11111b;
+      color: #89b4fa;
+    }
+
+    .preview-tab .tab-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .preview-tab .tab-close {
+      background: none;
+      border: none;
+      color: #585b70;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .preview-tab .tab-close:hover { color: #f38ba8; }
+
+    #btn-new-tab {
+      padding: 4px 12px;
+      background: none;
+      border: none;
+      color: #6c7086;
+      font-size: 16px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    #btn-new-tab:hover { color: #89b4fa; }
+
+    #webview-stack {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .preview-webview {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    #encode-progress {
+      display: none;
+      width: 80px;
+      height: 6px;
+      background: #313244;
+      border-radius: 3px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    #encode-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #89b4fa, #a6e3a1);
+      transition: width 0.3s;
+    }
+
+    #editor-history,
+    #editor-file {
+      padding: 3px 8px;
+      background: #313244;
+      border: 1px solid #45475a;
+      border-radius: 5px;
+      color: #cdd6f4;
+      font-size: 10px;
+    }
+
+    #editor-file { max-width: 220px; }
+    #editor-history { max-width: 140px; }
+
+    .edit-actions { display: flex; gap: 6px; align-items: center; }
+
+    .edit-action-btn {
+      padding: 3px 8px;
+      background: #313244;
+      border: 1px solid #45475a;
+      border-radius: 5px;
+      color: #cdd6f4;
+      font-size: 11px;
+      cursor: pointer;
+      line-height: 1.2;
+    }
+
+    .edit-action-btn:hover { background: #45475a; }
+
+    #editor-search-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: #181825;
+      border-bottom: 1px solid #313244;
+      flex-shrink: 0;
+    }
+
+    #editor-search {
+      flex: 1;
+      min-width: 0;
+      padding: 5px 8px;
+      background: #11111b;
+      border: 1px solid #313244;
+      border-radius: 5px;
+      color: #cdd6f4;
+      font-size: 11px;
+      outline: none;
+    }
+
+    #editor-search:focus { border-color: #89b4fa; }
+
+    .search-nav-btn {
+      padding: 4px 8px;
+      background: #313244;
+      border: 1px solid #45475a;
+      border-radius: 5px;
+      color: #cdd6f4;
+      font-size: 10px;
+      cursor: pointer;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .search-nav-btn:hover { background: #45475a; }
+
+    #editor-search-status {
+      font-size: 10px;
+      color: #585b70;
+      white-space: nowrap;
+      min-width: 48px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    #editor-search-status.match { color: #a6adc8; }
+    #editor-search-status.none { color: #f38ba8; }
+
+    #empty-msg {
+      text-align: center;
+      color: #585b70;
+      font-size: 13px;
+      padding: 40px 20px;
+    }
+
+    #content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    #main-stack {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    #address-bar {
+      height: 38px;
+      background: #181825;
+      border-bottom: 1px solid #313244;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      flex-shrink: 0;
+    }
+
+    #address-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .addr-btn {
+      padding: 5px 10px;
+      background: #313244;
+      border: 1px solid #45475a;
+      border-radius: 5px;
+      color: #cdd6f4;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .addr-btn:hover { background: #45475a; }
+    .addr-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .addr-btn.active {
+      background: #89b4fa33;
+      border-color: #89b4fa;
+      color: #89b4fa;
+    }
+
+    #save-status {
+      font-size: 11px;
+      color: #6c7086;
+      white-space: nowrap;
+      flex-shrink: 0;
+      min-width: 80px;
+    }
+
+    #save-status.saving { color: #f9e2af; }
+    #save-status.saved { color: #a6e3a1; }
+    #save-status.error { color: #f38ba8; }
+
+    #url-display {
+      flex: 1;
+      min-width: 60px;
+      font-size: 12px;
+      color: #6c7086;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #preview-area {
+      flex: 1;
+      display: flex;
+      min-height: 160px;
+      min-width: 0;
+      overflow: hidden;
+      background: #11111b;
+    }
+
+    #terminal-resizer-v {
+      height: 5px;
+      cursor: row-resize;
+      background: #313244;
+      flex-shrink: 0;
+      display: none;
+    }
+
+    #terminal-resizer-v:hover, #terminal-resizer-v.dragging { background: #89b4fa; }
+    #main-stack.terminal-open #terminal-resizer-v { display: block; }
+
+    #terminal-panel {
+      height: 240px;
+      min-height: 120px;
+      max-height: 55vh;
+      display: none;
+      flex-direction: column;
+      background: #11111b;
+      border-top: 1px solid #313244;
+      flex-shrink: 0;
+    }
+
+    #main-stack.terminal-open #terminal-panel { display: flex; }
+
+    #terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: #181825;
+      border-bottom: 1px solid #313244;
+      flex-shrink: 0;
+    }
+
+    #terminal-header .term-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #a6adc8;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-right: auto;
+    }
+
+    .term-btn {
+      padding: 4px 10px;
+      background: #313244;
+      border: 1px solid #45475a;
+      border-radius: 5px;
+      color: #cdd6f4;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .term-btn:hover { background: #45475a; }
+    .term-btn.mimo { border-color: #89b4fa55; color: #89b4fa; }
+    .term-btn.mimo:hover { background: #89b4fa22; }
+
+    #terminal-status {
+      font-size: 10px;
+      color: #585b70;
+      padding: 0 10px 4px;
+      background: #181825;
+      flex-shrink: 0;
+    }
+
+    #terminal-status.ok { color: #a6e3a1; }
+    #terminal-status.warn { color: #f9e2af; }
+
+    #terminal-container {
+      flex: 1;
+      min-height: 0;
+      padding: 4px 6px 6px;
+    }
+
+    #terminal-container .xterm {
+      height: 100%;
+    }
+
+    #preview-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #webview-container { flex: 1; min-width: 0; }
+
+    #edit-resizer {
+      width: 5px;
+      cursor: col-resize;
+      background: #313244;
+      flex-shrink: 0;
+      display: none;
+      transition: background 0.15s;
+    }
+
+    #edit-resizer:hover, #edit-resizer.dragging { background: #89b4fa; }
+    #edit-resizer.dragging, #terminal-resizer-v.dragging { transition: none; }
+
+    #drag-shield {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: none;
+      user-select: none;
+    }
+
+    #drag-shield.active { display: block; }
+    #drag-shield.col { cursor: col-resize; }
+    #drag-shield.row { cursor: row-resize; }
+
+    body.is-dragging webview,
+    body.is-dragging .preview-webview {
+      pointer-events: none;
+    }
+    #preview-area.edit-open #edit-resizer { display: block; }
+
+    #edit-panel {
+      width: 38%;
+      min-width: 280px;
+      max-width: 55%;
+      display: none;
+      flex-direction: column;
+      flex-shrink: 0;
+      background: #181825;
+      border-left: 1px solid #313244;
+    }
+
+    #preview-area.edit-open #edit-panel { display: flex; }
+
+    #edit-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid #313244;
+      background: #11111b;
+      flex-shrink: 0;
+    }
+
+    #edit-panel-header span {
+      font-size: 11px;
+      font-weight: 600;
+      color: #a6adc8;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    #edit-panel-hint {
+      font-size: 10px;
+      color: #585b70;
+      margin-left: 8px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    #btn-close-edit {
+      background: none;
+      border: none;
+      color: #6c7086;
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 4px;
+    }
+
+    #btn-close-edit:hover { color: #f38ba8; }
+
+    webview { width: 100%; height: 100%; border: none; }
+
+    #status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #a6e3a1;
+      flex-shrink: 0;
+    }
+
+    #status-dot.offline { background: #f38ba8; }
+
+    #folder-count {
+      font-size: 11px;
+      color: #585b70;
+      padding: 8px 12px;
+      border-top: 1px solid #313244;
+    }
+
+    #context-menu {
+      display: none;
+      position: fixed;
+      background: #1e1e2e;
+      border: 1px solid #313244;
+      border-radius: 8px;
+      padding: 4px;
+      z-index: 1000;
+      min-width: 180px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+
+    #context-menu .menu-item {
+      padding: 8px 14px;
+      font-size: 13px;
+      color: #cdd6f4;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #context-menu .menu-item:hover { background: #45475a; }
+
+    #context-menu .menu-sep {
+      height: 1px;
+      background: #313244;
+      margin: 4px 8px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #313244;
+      border: 1px solid #45475a;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      color: #a6e3a1;
+      z-index: 2000;
+      animation: fadeIn 0.2s;
+    }
+
+    .toast.error { color: #f38ba8; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #313244; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #45475a; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h2>Лендинги</h2>
+      <div class="toolbar">
+        <button id="btn-copy">Копировать папку</button>
+      </div>
+      <div id="search-row">
+        <input type="text" id="search" placeholder="Поиск...">
+        <label class="search-opt"><input type="checkbox" id="search-in-code"> в коде index.php</label>
+      </div>
+    </div>
+
+    <div id="recents-panel">
+      <div class="side-panel-header" id="recents-header">
+        <span>Недавние</span>
+        <span class="arrow">▼</span>
+      </div>
+      <div id="recents-list"></div>
+    </div>
+
+    <div id="bookmarks-panel">
+      <div class="side-panel-header" id="bookmarks-header">
+        <span>Закладки</span>
+        <span class="arrow">▼</span>
+      </div>
+      <div id="bookmarks-list"></div>
+    </div>
+
+    <div id="dir-panel">
+      <div id="dir-panel-header">
+        <span>Директории</span>
+        <span class="arrow">▼</span>
+      </div>
+      <div id="dir-list"></div>
+    </div>
+
+    <div id="folder-list">
+      <div id="empty-msg">Загрузка...</div>
+    </div>
+    <div id="folder-count"></div>
+  </div>
+  <div id="content">
+    <div id="address-bar">
+      <div id="address-actions">
+        <div id="status-dot"></div>
+        <button class="addr-btn" id="btn-edit" title="Редактировать PHP-файлы">Редактировать</button>
+        <button class="addr-btn" id="btn-video" title="Заменить и сжать видео">Заменить видео</button>
+        <button class="addr-btn" id="btn-reload" title="Обновить страницу (F5)">↻</button>
+        <button class="addr-btn" id="btn-finder" title="Показать папку в Finder">Finder</button>
+        <button class="addr-btn" id="btn-duplicate" title="Дублировать лендинг">Дубль</button>
+        <button class="addr-btn" id="btn-bookmark" title="Закладка">☆</button>
+        <button class="addr-btn" id="btn-terminal" title="Терминал">Терминал</button>
+        <div id="encode-progress"><div id="encode-progress-fill"></div></div>
+      </div>
+      <div id="save-status"></div>
+      <div id="url-display">Выберите лендинг</div>
+    </div>
+    <div id="main-stack">
+      <div id="preview-area">
+        <div id="preview-main">
+          <div id="tabs-bar">
+            <div id="tabs-list"></div>
+            <button id="btn-new-tab" title="Новая вкладка">+</button>
+          </div>
+          <div id="webview-stack"></div>
+        </div>
+        <div id="edit-resizer"></div>
+        <div id="edit-panel">
+          <div id="edit-panel-header">
+            <div>
+              <select id="editor-file" title="Выберите PHP-файл"></select>
+              <span id="edit-panel-hint">автосохранение · ↻ обновить с диска</span>
+            </div>
+            <div class="edit-actions">
+              <button type="button" id="btn-reload-edit" class="edit-action-btn" title="Обновить файл с диска (Cmd+Shift+R)">↻</button>
+              <select id="editor-history" title="История изменений"><option value="">История</option></select>
+              <button id="btn-close-edit" title="Закрыть редактор">×</button>
+            </div>
+          </div>
+          <div id="editor-search-bar">
+            <input type="text" id="editor-search" placeholder="Поиск в файле..." autocomplete="off" spellcheck="false">
+            <button type="button" id="editor-search-prev" class="search-nav-btn" title="Назад (Shift+Enter)">▲</button>
+            <button type="button" id="editor-search-next" class="search-nav-btn" title="Вперёд (Enter)">▼</button>
+            <span id="editor-search-status"></span>
+          </div>
+          <div id="editor-wrap">
+            <textarea id="source-editor" spellcheck="false"></textarea>
+          </div>
+        </div>
+      </div>
+      <div id="terminal-resizer-v"></div>
+      <div id="terminal-panel">
+        <div id="terminal-header">
+          <span class="term-title">Терминал</span>
+          <button class="term-btn mimo" id="btn-mimo" title="Запустить MiMo Code">MiMo</button>
+          <button class="term-btn" id="btn-term-new" title="Новая сессия">Новая</button>
+          <button class="term-btn" id="btn-term-clear" title="Очистить экран">Очистить</button>
+          <button class="term-btn" id="btn-term-close" title="Закрыть">×</button>
+        </div>
+        <div id="terminal-status"></div>
+        <div id="terminal-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="context-menu">
+    <div class="menu-item" id="ctx-open">Открыть</div>
+    <div class="menu-sep"></div>
+    <div class="menu-item" id="ctx-copy">Копировать папку</div>
+    <div class="menu-item" id="ctx-duplicate">Дублировать</div>
+    <div class="menu-item" id="ctx-bookmark">В закладки</div>
+    <div class="menu-item" id="ctx-reveal">Показать в Finder</div>
+  </div>
+
+  <script src="node_modules/codemirror/lib/codemirror.js"></script>
+  <script src="node_modules/codemirror/mode/xml/xml.js"></script>
+  <script src="node_modules/codemirror/mode/javascript/javascript.js"></script>
+  <script src="node_modules/codemirror/mode/css/css.js"></script>
+  <script src="node_modules/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+  <script src="node_modules/codemirror/mode/clike/clike.js"></script>
+  <script src="node_modules/codemirror/mode/php/php.js"></script>
+  <script src="node_modules/codemirror/addon/edit/matchbrackets.js"></script>
+  <script src="node_modules/codemirror/addon/edit/closebrackets.js"></script>
+  <script src="node_modules/codemirror/addon/selection/active-line.js"></script>
+  <script src="node_modules/codemirror/addon/search/searchcursor.js"></script>
+  <script src="editor.js"></script>
+  <script src="node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="terminal-panel.js"></script>
+  <script src="features.js"></script>
+  <script>
+    const folderList = document.getElementById('folder-list');
+    const searchInput = document.getElementById('search');
+    const urlDisplay = document.getElementById('url-display');
+    function activeWebview() {
+      return AppFeatures.TabManager.getActiveWebview();
+    }
+    const statusDot = document.getElementById('status-dot');
+    const folderCount = document.getElementById('folder-count');
+    const contextMenu = document.getElementById('context-menu');
+    const btnCopy = document.getElementById('btn-copy');
+    const btnEdit = document.getElementById('btn-edit');
+    const btnVideo = document.getElementById('btn-video');
+    const btnReload = document.getElementById('btn-reload');
+    const btnTerminal = document.getElementById('btn-terminal');
+    const saveStatus = document.getElementById('save-status');
+    const mainStack = document.getElementById('main-stack');
+    const previewArea = document.getElementById('preview-area');
+    const editPanel = document.getElementById('edit-panel');
+    const sourceEditor = document.getElementById('source-editor');
+    const btnCloseEdit = document.getElementById('btn-close-edit');
+    const editResizer = document.getElementById('edit-resizer');
+    const terminalPanel = document.getElementById('terminal-panel');
+    const terminalContainer = document.getElementById('terminal-container');
+    const terminalStatus = document.getElementById('terminal-status');
+    const terminalResizerV = document.getElementById('terminal-resizer-v');
+    const btnMimo = document.getElementById('btn-mimo');
+    const btnTermNew = document.getElementById('btn-term-new');
+    const btnTermClear = document.getElementById('btn-term-clear');
+    const btnTermClose = document.getElementById('btn-term-close');
+    const dirPanel = document.getElementById('dir-panel');
+    const dirPanelHeader = document.getElementById('dir-panel-header');
+    const dirList = document.getElementById('dir-list');
+
+    let allFolders = [];
+    let activeFolder = null;
+    let contextTarget = null;
+    let dirPanelOpen = true;
+    let collapsedGroups = new Set();
+    let editMode = false;
+    let saveStatusTimer = null;
+    let pendingSave = null;
+    let savedSource = '';
+    let sourceSaveTimer = null;
+    const SOURCE_SAVE_DELAY_MS = 1200;
+    let terminalOpen = false;
+    let terminalInited = false;
+    let videoEncoding = false;
+    let videoEncodingFolder = null;
+    let mimoActive = false;
+    let activeEditorFile = 'index.php';
+    let editorFileSelect = null;
+    let currentPhpRoot = null;
+
+    async function reloadEditorFromDisk(force = false) {
+      if (!editMode || !activeFolder) return false;
+      const current = SourceEditor.getValue();
+      if (!force && current !== savedSource) {
+        if (!confirm(`Есть несохранённые изменения. Загрузить ${activeEditorFile} с диска?`)) return false;
+      }
+
+      const res = await window.api.getLandingSource(activeFolder, activeEditorFile);
+      if (!res.ok) {
+        showToast(res.error || 'Не удалось загрузить файл', true);
+        return false;
+      }
+
+      savedSource = res.content;
+      SourceEditor.setValue(res.content);
+      editorSearchInput.value = '';
+      SourceEditor.clearSearch();
+      editorSearchStatus.textContent = '';
+      editorSearchStatus.className = '';
+      setSaveStatus('Загружено с диска', 'saved');
+      requestAnimationFrame(() => SourceEditor.refresh());
+      return true;
+    }
+
+    async function populateEditorFileList() {
+      if (!editorFileSelect || !activeFolder) return;
+      const files = await window.api.listLandingPhpFiles(activeFolder);
+      editorFileSelect.innerHTML = '';
+      if (files.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = 'index.php';
+        opt.textContent = 'index.php';
+        editorFileSelect.appendChild(opt);
+        return;
+      }
+      for (const f of files) {
+        const opt = document.createElement('option');
+        opt.value = f;
+        opt.textContent = f;
+        editorFileSelect.appendChild(opt);
+      }
+    }
+
+    async function loadEditorFile(relativeFile) {
+      const res = await window.api.getLandingSource(activeFolder, relativeFile);
+      if (!res.ok) {
+        showToast(res.error || `Не удалось загрузить ${relativeFile}`, true);
+        return false;
+      }
+      activeEditorFile = res.file || relativeFile;
+      if (editorFileSelect) editorFileSelect.value = activeEditorFile;
+      savedSource = res.content;
+      SourceEditor.setValue(res.content);
+      editorSearchInput.value = '';
+      SourceEditor.clearSearch();
+      editorSearchStatus.textContent = '';
+      editorSearchStatus.className = '';
+      AppFeatures.refreshEditorHistory(activeFolder, activeEditorFile);
+      requestAnimationFrame(() => SourceEditor.refresh());
+      return true;
+    }
+
+    async function switchEditorFile(newFile) {
+      if (!editMode || newFile === activeEditorFile) return;
+      if (SourceEditor.getValue() !== savedSource) {
+        if (!confirm('Есть несохранённые изменения. Переключить файл?')) {
+          if (editorFileSelect) editorFileSelect.value = activeEditorFile;
+          return;
+        }
+      }
+      await loadEditorFile(newFile);
+    }
+
+    async function reloadPage() {
+      if (!activeFolder) { showToast('Выберите лендинг', true); return; }
+      activeWebview()?.reload();
+      if (editMode) await reloadEditorFromDisk(true);
+      showToast(editMode ? 'Превью и редактор обновлены' : 'Страница обновлена');
+    }
+
+    async function updateMimoStatus() {
+      const info = await window.api.checkMimo();
+      if (info.installed) {
+        terminalStatus.textContent = `MiMo ${info.version || ''} — ${info.path}`;
+        terminalStatus.className = 'ok';
+      } else {
+        terminalStatus.textContent = 'MiMo не установлен — нажмите кнопку MiMo для установки';
+        terminalStatus.className = 'warn';
+      }
+      return info;
+    }
+
+    async function ensureTerminalSession() {
+      if (!terminalInited) {
+        TerminalPanel.init(terminalContainer);
+        terminalInited = true;
+      }
+      if (!TerminalPanel.isStarted()) {
+        const cwd = await window.api.getTerminalCwd(activeFolder);
+        await TerminalPanel.start(cwd);
+      }
+    }
+
+    async function openTerminal() {
+      terminalOpen = true;
+      mainStack.classList.add('terminal-open');
+      btnTerminal.classList.add('active');
+      await ensureTerminalSession();
+      await updateMimoStatus();
+      requestAnimationFrame(() => TerminalPanel.fit());
+    }
+
+    function closeTerminal() {
+      terminalOpen = false;
+      mainStack.classList.remove('terminal-open');
+      btnTerminal.classList.remove('active');
+    }
+
+    async function cdTerminalToFolder(folder) {
+      if (!terminalOpen || !TerminalPanel.isStarted() || !folder) return;
+      if (mimoActive) return;
+      const cwd = await window.api.getTerminalCwd(folder);
+      TerminalPanel.runCommand(`cd ${JSON.stringify(cwd)}`);
+    }
+
+    async function launchMimo() {
+      await openTerminal();
+      const info = await window.api.checkMimo();
+      if (!info.installed) {
+        const prompt = await window.api.promptInstallMimo();
+        if (!prompt.ok) return;
+        const { command } = await window.api.getMimoInstallCommand();
+        TerminalPanel.writeln('\r\n\x1b[36m# Установка MiMo Code...\x1b[0m');
+        TerminalPanel.runCommand(command);
+        terminalStatus.textContent = 'Установка MiMo... После завершения снова нажмите MiMo';
+        terminalStatus.className = 'warn';
+        return;
+      }
+      if (activeFolder) {
+        const cwd = await window.api.getTerminalCwd(activeFolder);
+        TerminalPanel.runCommand(`cd ${JSON.stringify(cwd)}`);
+      }
+      TerminalPanel.runCommand('mimo');
+      mimoActive = true;
+      terminalStatus.textContent = `MiMo запущен (${info.version || info.path}) — не переключайте папку во время работы`;
+      terminalStatus.className = 'ok';
+    }
+
+    function setSaveStatus(text, cls = '') {
+      saveStatus.textContent = text;
+      saveStatus.className = cls;
+      clearTimeout(saveStatusTimer);
+      if (cls === 'saved') {
+        saveStatusTimer = setTimeout(() => {
+          if (saveStatus.className === 'saved') {
+            saveStatus.textContent = '';
+            saveStatus.className = '';
+          }
+        }, 2500);
+      }
+    }
+
+    async function openEditPanel() {
+      if (!activeFolder) { showToast('Выберите лендинг', true); return; }
+
+      editMode = true;
+      previewArea.classList.add('edit-open');
+      btnEdit.classList.add('active');
+      btnEdit.textContent = 'Редактор';
+
+      await populateEditorFileList();
+      activeEditorFile = 'index.php';
+      const files = [...editorFileSelect.options].map((o) => o.value);
+      if (!files.includes('index.php') && files.length) activeEditorFile = files[0];
+
+      const ok = await loadEditorFile(activeEditorFile);
+      if (!ok) {
+        editMode = false;
+        previewArea.classList.remove('edit-open');
+        btnEdit.classList.remove('active');
+        btnEdit.textContent = 'Редактировать';
+        return;
+      }
+
+      SourceEditor.focus();
+    }
+
+    async function flushSourceSave() {
+      clearTimeout(sourceSaveTimer);
+      if (!editMode || !activeFolder) return;
+      const current = SourceEditor.getValue();
+      if (current === savedSource) return;
+      if (pendingSave) await pendingSave;
+
+      setSaveStatus('Сохранение...', 'saving');
+      pendingSave = window.api.saveLandingSource(activeFolder, current, activeEditorFile);
+      const res = await pendingSave;
+      pendingSave = null;
+
+      if (res.ok) {
+        savedSource = current;
+        setSaveStatus('Сохранено', 'saved');
+        if (activeEditorFile === 'index.php') activeWebview()?.reload();
+        AppFeatures.refreshEditorHistory(activeFolder, activeEditorFile);
+      } else {
+        setSaveStatus('Ошибка', 'error');
+        showToast(res.error || 'Ошибка сохранения', true);
+      }
+    }
+
+    function scheduleSourceSave() {
+      if (!editMode) return;
+      setSaveStatus('Изменено', 'saving');
+      clearTimeout(sourceSaveTimer);
+      sourceSaveTimer = setTimeout(flushSourceSave, SOURCE_SAVE_DELAY_MS);
+    }
+
+    async function closeEditPanel() {
+      if (!editMode) return;
+      await flushSourceSave();
+      editMode = false;
+      previewArea.classList.remove('edit-open');
+      btnEdit.classList.remove('active');
+      btnEdit.textContent = 'Редактировать';
+      SourceEditor.setValue('');
+      activeEditorFile = 'index.php';
+      editorSearchInput.value = '';
+      SourceEditor.clearSearch();
+      editorSearchStatus.textContent = '';
+      editorSearchStatus.className = '';
+      setSaveStatus('');
+    }
+
+    function showToast(msg, isError = false) {
+      const t = document.createElement('div');
+      t.className = 'toast' + (isError ? ' error' : '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 2500);
+    }
+
+    async function loadDirectories() {
+      const dirs = await window.api.getDirectories();
+      renderDirectories(dirs);
+      if (currentPhpRoot && !dirs.includes(currentPhpRoot)) {
+        currentPhpRoot = dirs[0] || null;
+      } else if (dirs[0] && currentPhpRoot === null) {
+        currentPhpRoot = dirs[0];
+      }
+    }
+
+    function renderDirectories(dirs) {
+      dirList.innerHTML = '';
+      if (dirs.length === 0) {
+        const hint = document.createElement('div');
+        hint.className = 'dir-empty-hint';
+        hint.textContent = 'Нет директорий — добавьте папку с лендингами';
+        dirList.appendChild(hint);
+      }
+      for (const dir of dirs) {
+        const el = document.createElement('div');
+        el.className = 'dir-item';
+        el.innerHTML = `
+          <span class="dir-path" title="${dir}">${dir}</span>
+          <button class="dir-remove" title="Удалить">×</button>
+        `;
+        el.querySelector('.dir-remove').addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const updated = await window.api.removeDirectory(dir);
+          renderDirectories(updated);
+          await loadFolders();
+        });
+        dirList.appendChild(el);
+      }
+
+      const addBtn = document.createElement('button');
+      addBtn.id = 'btn-add-dir';
+      addBtn.textContent = '+ Добавить директорию';
+      addBtn.addEventListener('click', async () => {
+        const res = await window.api.addDirectory();
+        if (res.ok) {
+          renderDirectories(res.directories);
+          await loadFolders();
+          showToast('Директория добавлена');
+        } else if (res.error) {
+          showToast(res.error, true);
+        }
+      });
+      dirList.appendChild(addBtn);
+    }
+
+    dirPanelHeader.addEventListener('click', () => {
+      dirPanelOpen = !dirPanelOpen;
+      dirList.style.display = dirPanelOpen ? 'block' : 'none';
+      dirPanelHeader.classList.toggle('collapsed', !dirPanelOpen);
+    });
+
+    async function loadFolders() {
+      allFolders = await window.api.scanFolders();
+      renderFolders(allFolders);
+      await loadDirectories();
+      await AppFeatures.loadBookmarksRecents();
+    }
+
+    function groupByDir(folders) {
+      const map = new Map();
+      for (const f of folders) {
+        if (!map.has(f.dir)) map.set(f.dir, []);
+        map.get(f.dir).push(f);
+      }
+      return map;
+    }
+
+    function renderFolders(folders) {
+      folderList.innerHTML = '';
+
+      if (folders.length === 0) {
+        folderList.innerHTML = '<div id="empty-msg">Нет лендингов</div>';
+        folderCount.textContent = '';
+        return;
+      }
+
+      folderCount.textContent = `${folders.length} папок`;
+      const groups = groupByDir(folders);
+      const query = searchInput.value.trim().toLowerCase();
+
+      for (const [dir, items] of groups) {
+        const isCollapsed = collapsedGroups.has(dir) && !query;
+        const shortDir = dir.split('/').filter(Boolean).pop() || dir;
+
+        const header = document.createElement('div');
+        header.className = 'group-header' + (isCollapsed ? ' collapsed' : '');
+        header.innerHTML = `
+          <span class="chevron">▼</span>
+          <span class="group-name" title="${dir}">${shortDir}</span>
+          <span class="group-count">${items.length}</span>
+        `;
+
+        const itemsContainer = document.createElement('div');
+        itemsContainer.className = 'group-items' + (isCollapsed ? ' collapsed' : '');
+
+        header.addEventListener('click', () => {
+          const wasCollapsed = itemsContainer.classList.contains('collapsed');
+          if (wasCollapsed) {
+            collapsedGroups.delete(dir);
+          } else {
+            collapsedGroups.add(dir);
+          }
+          header.classList.toggle('collapsed');
+          if (wasCollapsed) {
+            itemsContainer.classList.remove('collapsed');
+            itemsContainer.style.maxHeight = itemsContainer.scrollHeight + 'px';
+          } else {
+            itemsContainer.style.maxHeight = itemsContainer.scrollHeight + 'px';
+            requestAnimationFrame(() => {
+              itemsContainer.classList.add('collapsed');
+            });
+          }
+        });
+
+        for (const folder of items) {
+          const el = document.createElement('div');
+          const isActive = activeFolder && folderKey(activeFolder) === folderKey(folder);
+          el.className = 'folder-item' + (isActive ? ' active' : '');
+          el.appendChild(document.createTextNode(folder.relativePath || folder.name));
+          AppFeatures.decorateFolderItem(el, folder);
+          el.addEventListener('click', () => selectFolder(folder));
+          el.addEventListener('contextmenu', (e) => showContextMenu(e, folder));
+          itemsContainer.appendChild(el);
+        }
+
+        folderList.appendChild(header);
+        folderList.appendChild(itemsContainer);
+
+        if (!isCollapsed) {
+          requestAnimationFrame(() => {
+            itemsContainer.style.maxHeight = itemsContainer.scrollHeight + 'px';
+          });
+        }
+      }
+    }
+
+    function folderKey(f) {
+      return f ? `${f.dir}\0${f.relativePath || ''}` : '';
+    }
+
+    function buildUrl(folder) {
+      const segments = (folder.relativePath || '').split(/[/\\]/).filter(s => s && s !== '.');
+      let url;
+      if (segments.length === 0) url = 'http://localhost:8080/index.php';
+      else {
+        const encoded = segments.map(s => encodeURIComponent(s)).join('/');
+        url = `http://localhost:8080/${encoded}/index.php`;
+      }
+      return url;
+    }
+
+    function scrollActiveIntoView() {
+      const active = folderList.querySelector('.folder-item.active');
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    }
+
+    async function selectFolder(folder) {
+      if (videoEncoding && videoEncodingFolder
+          && folderKey(folder) !== folderKey(videoEncodingFolder)) {
+        const label = videoEncodingFolder.relativePath || videoEncodingFolder.name;
+        const { ok } = await window.api.confirmSwitchDuringEncode(label);
+        if (!ok) return;
+      }
+
+      if (editMode) await closeEditPanel();
+      activeFolder = folder;
+      if (folder.dir !== currentPhpRoot) {
+        const rootRes = await window.api.setPhpRoot(folder.dir);
+        if (rootRes.ok) currentPhpRoot = folder.dir;
+        else showToast(rootRes.error || 'PHP-сервер не запустился', true);
+      }
+      const url = buildUrl(folder);
+      urlDisplay.textContent = url;
+      AppFeatures.TabManager.updateActive(folder, url);
+      renderFolders(getFilteredFolders());
+      scrollActiveIntoView();
+      setSaveStatus(videoEncoding ? 'Кодирование видео...' : '');
+      cdTerminalToFolder(folder);
+      await AppFeatures.onFolderOpened(folder);
+    }
+
+    function getFilteredFolders() {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) return allFolders;
+      return allFolders.filter(f =>
+        f.name.toLowerCase().includes(q) ||
+        f.relativePath.toLowerCase().includes(q)
+      );
+    }
+
+    async function applySearchFilter() {
+      const q = searchInput.value.trim().toLowerCase();
+      let list = !q ? allFolders : getFilteredFolders();
+      if (document.getElementById('search-in-code')?.checked && q.length >= 2) {
+        list = await AppFeatures.filterContentSearch(q, list);
+      }
+      renderFolders(list);
+    }
+
+    function showContextMenu(e, folder) {
+      e.preventDefault();
+      contextTarget = folder;
+      contextMenu.style.display = 'block';
+      contextMenu.style.left = e.clientX + 'px';
+      contextMenu.style.top = e.clientY + 'px';
+    }
+
+    document.addEventListener('click', () => {
+      contextMenu.style.display = 'none';
+    });
+
+    document.getElementById('ctx-open').addEventListener('click', () => {
+      if (contextTarget) selectFolder(contextTarget);
+    });
+
+    document.getElementById('ctx-copy').addEventListener('click', async () => {
+      if (!contextTarget) return;
+      const res = await window.api.copyFolder(contextTarget);
+      if (res.ok) showToast('Папка скопирована — вставьте через Cmd+V');
+      else showToast('Ошибка: ' + res.error, true);
+    });
+
+    document.getElementById('ctx-reveal').addEventListener('click', () => {
+      if (contextTarget) window.api.revealInFinder(contextTarget);
+    });
+
+    document.getElementById('ctx-duplicate').addEventListener('click', async () => {
+      if (!contextTarget) return;
+      const res = await window.api.duplicateLanding(contextTarget);
+      if (res.ok) {
+        showToast('Копия создана');
+        await loadFolders();
+        selectFolder(res.folder);
+      } else showToast(res.error, true);
+    });
+
+    document.getElementById('ctx-bookmark').addEventListener('click', async () => {
+      if (!contextTarget) return;
+      const on = await AppFeatures.toggleBookmark(contextTarget);
+      showToast(on ? 'В закладках' : 'Убрано из закладок');
+      renderFolders(getFilteredFolders());
+    });
+
+    btnCopy.addEventListener('click', async () => {
+      if (!activeFolder) { showToast('Выберите папку', true); return; }
+      const res = await window.api.copyFolder(activeFolder);
+      if (res.ok) showToast('Папка скопирована — вставьте через Cmd+V');
+      else showToast('Ошибка: ' + res.error, true);
+    });
+
+    btnEdit.addEventListener('click', async () => {
+      if (!activeFolder) { showToast('Выберите лендинг', true); return; }
+      if (editMode) {
+        await closeEditPanel();
+        return;
+      }
+      await openEditPanel();
+    });
+
+    btnCloseEdit.addEventListener('click', () => closeEditPanel());
+    editorFileSelect = document.getElementById('editor-file');
+    editorFileSelect.addEventListener('change', () => switchEditorFile(editorFileSelect.value));
+    document.getElementById('btn-reload-edit').addEventListener('click', () => reloadEditorFromDisk(false));
+    SourceEditor.init(sourceEditor);
+    SourceEditor.onChange(() => {
+      scheduleSourceSave();
+      if (editorSearchInput.value.trim()) {
+        clearTimeout(editorSearchTimer);
+        editorSearchTimer = setTimeout(() => {
+          const { total } = SourceEditor.updateSearchHighlight(editorSearchInput.value);
+          setEditorSearchStatus({ total, found: false, index: 0 });
+        }, 200);
+      }
+    });
+    window._editorSave = flushSourceSave;
+
+    const editorSearchInput = document.getElementById('editor-search');
+    const editorSearchStatus = document.getElementById('editor-search-status');
+    const editorSearchPrev = document.getElementById('editor-search-prev');
+    const editorSearchNext = document.getElementById('editor-search-next');
+    let editorSearchTimer = null;
+
+    function setEditorSearchStatus(res) {
+      editorSearchStatus.className = '';
+      if (!editorSearchInput.value.trim()) {
+        editorSearchStatus.textContent = '';
+        return;
+      }
+      if (!res.total) {
+        editorSearchStatus.textContent = '0';
+        editorSearchStatus.classList.add('none');
+      } else if (res.found && res.index) {
+        editorSearchStatus.textContent = `${res.index}/${res.total}`;
+        editorSearchStatus.classList.add('match');
+      } else {
+        editorSearchStatus.textContent = String(res.total);
+        editorSearchStatus.classList.add('match');
+      }
+    }
+
+    function runEditorSearch(backward) {
+      const res = SourceEditor.search(editorSearchInput.value, backward);
+      setEditorSearchStatus(res);
+    }
+
+    window._editorFocusSearch = () => {
+      if (!editMode) return;
+      editorSearchInput.focus();
+      editorSearchInput.select();
+    };
+
+    editorSearchInput.addEventListener('input', () => {
+      clearTimeout(editorSearchTimer);
+      editorSearchTimer = setTimeout(() => {
+        const { total } = SourceEditor.updateSearchHighlight(editorSearchInput.value);
+        setEditorSearchStatus({ total, found: false, index: 0 });
+        if (total > 0) runEditorSearch(false);
+      }, 200);
+    });
+
+    editorSearchNext.addEventListener('click', () => runEditorSearch(false));
+    editorSearchPrev.addEventListener('click', () => runEditorSearch(true));
+
+    editorSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        runEditorSearch(e.shiftKey);
+      }
+      if (e.key === 'Escape') {
+        editorSearchInput.value = '';
+        SourceEditor.clearSearch();
+        setEditorSearchStatus({});
+        SourceEditor.focus();
+      }
+    });
+
+    btnTerminal.addEventListener('click', async () => {
+      if (terminalOpen) closeTerminal();
+      else await openTerminal();
+    });
+
+    btnMimo.addEventListener('click', () => launchMimo());
+    btnTermNew.addEventListener('click', async () => {
+      mimoActive = false;
+      const cwd = await window.api.getTerminalCwd(activeFolder);
+      await TerminalPanel.start(cwd);
+      await updateMimoStatus();
+    });
+    btnTermClear.addEventListener('click', () => TerminalPanel.clear());
+    btnTermClose.addEventListener('click', () => closeTerminal());
+
+    let activeDrag = null;
+    const dragShield = document.createElement('div');
+    dragShield.id = 'drag-shield';
+    document.body.appendChild(dragShield);
+
+    function stopDrag() {
+      if (!activeDrag) return;
+      document.removeEventListener('mousemove', activeDrag.onMove);
+      window.removeEventListener('mouseup', activeDrag.onEnd, true);
+      window.removeEventListener('blur', activeDrag.onEnd);
+      editResizer.classList.remove('dragging');
+      terminalResizerV.classList.remove('dragging');
+      dragShield.className = '';
+      document.body.classList.remove('is-dragging');
+      const kind = activeDrag.kind;
+      activeDrag = null;
+      if (kind === 'col') SourceEditor.refresh();
+      if (kind === 'row') TerminalPanel.fit();
+    }
+
+    function startDrag(kind, onMove) {
+      stopDrag();
+      activeDrag = { kind, onMove, onEnd: stopDrag };
+      dragShield.className = `active ${kind}`;
+      document.body.classList.add('is-dragging');
+      document.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', stopDrag, true);
+      window.addEventListener('blur', stopDrag);
+    }
+
+    editResizer.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      editResizer.classList.add('dragging');
+      startDrag('col', (ev) => {
+        const areaRect = previewArea.getBoundingClientRect();
+        const newWidth = areaRect.right - ev.clientX;
+        const clamped = Math.max(280, Math.min(areaRect.width * 0.55, newWidth));
+        editPanel.style.width = `${clamped}px`;
+      });
+    });
+
+    terminalResizerV.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      terminalResizerV.classList.add('dragging');
+      startDrag('row', (ev) => {
+        const stackRect = mainStack.getBoundingClientRect();
+        const newHeight = stackRect.bottom - ev.clientY;
+        const clamped = Math.max(120, Math.min(stackRect.height * 0.55, newHeight));
+        terminalPanel.style.height = `${clamped}px`;
+        TerminalPanel.fit();
+      });
+    });
+
+    window.addEventListener('resize', () => {
+      if (terminalOpen) TerminalPanel.fit();
+    });
+
+    btnReload.addEventListener('click', () => reloadPage());
+
+    btnVideo.addEventListener('click', async () => {
+      if (!activeFolder) { showToast('Выберите лендинг', true); return; }
+      if (videoEncoding) { showToast('Уже идёт кодирование', true); return; }
+
+      btnVideo.disabled = true;
+      btnVideo.textContent = 'Кодирование...';
+      videoEncoding = true;
+      videoEncodingFolder = { ...activeFolder };
+      setSaveStatus('Кодирование видео...', 'saving');
+      AppFeatures.setEncodeProgress(1);
+
+      const res = await window.api.replaceVideo(activeFolder);
+
+      videoEncoding = false;
+      videoEncodingFolder = null;
+      AppFeatures.setEncodeProgress(0);
+      btnVideo.disabled = false;
+      btnVideo.textContent = 'Заменить видео';
+      setSaveStatus('');
+
+      if (res.canceled) return;
+      if (res.ok) {
+        const sameLanding = activeFolder && res.folder
+          && folderKey(activeFolder) === folderKey(res.folder);
+        if (sameLanding) {
+          activeWebview()?.reload();
+          showToast(`Видео готово (~${res.estMb} МБ, ${res.videoKbps}k, preset ${res.preset})`);
+        } else {
+          showToast(`Видео готово для «${res.label}» — откройте этот лендинг`);
+        }
+      } else {
+        showToast('Ошибка: ' + res.error, true);
+      }
+    });
+
+    document.getElementById('webview-stack')?.addEventListener('did-start-loading', (e) => {
+      if (e.target.tagName === 'WEBVIEW') statusDot.classList.remove('offline');
+    }, true);
+
+    document.getElementById('webview-stack')?.addEventListener('did-fail-load', (e) => {
+      if (e.target.tagName === 'WEBVIEW') statusDot.classList.add('offline');
+    }, true);
+
+    searchInput.addEventListener('input', () => {
+      const scrollY = folderList.scrollTop;
+      const q = searchInput.value.trim().toLowerCase();
+      if (q) collapsedGroups.clear();
+      applySearchFilter();
+      folderList.scrollTop = scrollY;
+    });
+
+    document.getElementById('search-in-code')?.addEventListener('change', () => applySearchFilter());
+
+    window.__selectFolder = selectFolder;
+    window.__buildUrl = buildUrl;
+    window.__getActiveFolder = () => activeFolder;
+    window.__loadFolders = loadFolders;
+    window.__renderFolders = () => applySearchFilter();
+
+    window.__getActiveEditorFile = () => activeEditorFile;
+
+    window.__switchToFolder = async (folder) => {
+      if (!folder) return;
+      if (folder.dir !== currentPhpRoot) {
+        const rootRes = await window.api.setPhpRoot(folder.dir);
+        if (rootRes.ok) currentPhpRoot = folder.dir;
+        else showToast(rootRes.error || 'PHP-сервер не запустился', true);
+      }
+      activeFolder = folder;
+      urlDisplay.textContent = buildUrl(folder);
+      AppFeatures.updateBookmarkBtn(folder);
+      renderFolders(getFilteredFolders());
+      scrollActiveIntoView();
+      cdTerminalToFolder(folder);
+    };
+
+    AppFeatures.init({ showToast });
+
+    window.api.onPhpServerError((data) => {
+      const msg = data.detail ? `${data.detail} (порт ${data.port})` : `PHP-сервер недоступен (порт ${data.port})`;
+      showToast(msg, true);
+    });
+
+    window.api.onConfigPruned((removed) => {
+      loadDirectories();
+      AppFeatures.loadBookmarksRecents();
+      applySearchFilter();
+      const parts = [];
+      if (removed.directories) parts.push(`${removed.directories} директорий`);
+      if (removed.recents) parts.push(`${removed.recents} недавних`);
+      if (removed.bookmarks) parts.push(`${removed.bookmarks} закладок`);
+      if (parts.length) showToast(`Убрано из списков (нет на диске): ${parts.join(', ')}`);
+    });
+
+    loadDirectories();
+    loadFolders();
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'F5' || ((e.metaKey || e.ctrlKey) && e.key === 'r')) {
+        if (e.target === searchInput || SourceEditor.isFocused()) return;
+        e.preventDefault();
+        reloadPage();
+        return;
+      }
+      if (SourceEditor.isFocused()) {
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'r') {
+          e.preventDefault();
+          reloadEditorFromDisk(false);
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+          e.preventDefault();
+          flushSourceSave();
+        }
+        return;
+      }
+      if (e.target === searchInput || e.target === editorSearchInput) return;
+      const visible = getFilteredFolders();
+      if (visible.length === 0) return;
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const idx = visible.findIndex(f => activeFolder && folderKey(f) === folderKey(activeFolder));
+        let next;
+        if (e.key === 'ArrowDown') {
+          next = idx < visible.length - 1 ? idx + 1 : 0;
+        } else {
+          next = idx > 0 ? idx - 1 : visible.length - 1;
+        }
+        selectFolder(visible[next]);
+      }
+
+      if (e.key === 'Enter' && activeFolder) {
+        selectFolder(activeFolder);
+      }
+    });
+  </script>
+</body>
+</html>
